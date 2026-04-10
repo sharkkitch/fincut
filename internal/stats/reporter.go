@@ -1,55 +1,65 @@
 package stats
 
 import (
+	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 )
 
-// Format controls how a report is rendered.
-type Format string
-
-const (
-	FormatText Format = "text"
-	FormatJSON Format = "json"
-)
-
-// Reporter writes a Collector summary to an io.Writer.
+// Reporter writes collected statistics to an output writer
+// in either plain text or JSON format.
 type Reporter struct {
 	w      io.Writer
-	format Format
+	format string
 }
 
-// NewReporter creates a Reporter writing to w in the given format.
-// Returns an error if the format is unsupported.
-func NewReporter(w io.Writer, format Format) (*Reporter, error) {
+// NewReporter creates a Reporter that writes to w using the given format.
+// Supported formats: "plain", "json".
+func NewReporter(w io.Writer, format string) (*Reporter, error) {
+	if w == nil {
+		return nil, errors.New("stats: reporter writer must not be nil")
+	}
 	switch format {
-	case FormatText, FormatJSON:
+	case "plain", "json":
 		// valid
 	default:
-		return nil, fmt.Errorf("stats: unsupported format %q", format)
+		return nil, fmt.Errorf("stats: unsupported report format %q", format)
 	}
 	return &Reporter{w: w, format: format}, nil
 }
 
-// Write renders the collector's statistics to the reporter's writer.
-func (r *Reporter) Write(c *Collector) error {
-	var output string
+// Report writes a summary of the collector's statistics to the reporter's writer.
+func (r *Reporter) Report(c *Collector) {
 	switch r.format {
-	case FormatJSON:
-		output = fmt.Sprintf(
-			`{"lines_read":%d,"lines_matched":%d,"lines_dropped":%d,`+
-				`"bytes_read":%d,"filter_stages":%d,"match_rate":%.4f,"elapsed_ms":%d}\n`,
-			c.LinesRead,
-			c.LinesMatched,
-			c.LinesDropped,
-			c.BytesRead,
-			c.FilterStages,
-			c.MatchRate(),
-			c.Elapsed().Milliseconds(),
-		)
+	case "json":
+		r.writeJSON(c)
 	default:
-		output = c.Summary() + "\n"
+		r.writePlain(c)
 	}
-	_, err := fmt.Fprint(r.w, output)
-	return err
+}
+
+func (r *Reporter) writePlain(c *Collector) {
+	fmt.Fprintf(r.w, "matched:    %d\n", c.Matched())
+	fmt.Fprintf(r.w, "dropped:    %d\n", c.Dropped())
+	fmt.Fprintf(r.w, "total:      %d\n", c.Total())
+	fmt.Fprintf(r.w, "match_rate: %.2f%%\n", c.MatchRate()*100)
+	fmt.Fprintf(r.w, "elapsed:    %s\n", c.Elapsed())
+}
+
+func (r *Reporter) writeJSON(c *Collector) {
+	payload := map[string]interface{}{
+		"matched":    c.Matched(),
+		"dropped":    c.Dropped(),
+		"total":      c.Total(),
+		"match_rate": c.MatchRate(),
+		"elapsed_ms": c.Elapsed().Milliseconds(),
+	}
+	data, err := json.Marshal(payload)
+	if err != nil {
+		fmt.Fprintf(r.w, `{"error":%q}\n`, err.Error())
+		return
+	}
+	r.w.Write(data)
+	fmt.Fprintln(r.w)
 }
