@@ -79,6 +79,22 @@ func (c *Cache) Len() int {
 	return len(c.entries)
 }
 
+// Purge removes all expired entries from the cache and returns the number of
+// entries that were evicted. This can be called periodically to reclaim memory
+// without waiting for capacity-based eviction.
+func (c *Cache) Purge() int {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	n := 0
+	for k, e := range c.entries {
+		if time.Since(e.CachedAt) > c.ttl {
+			delete(c.entries, k)
+			n++
+		}
+	}
+	return n
+}
+
 // evictOldest removes the entry with the oldest CachedAt timestamp.
 // Caller must hold the write lock.
 func (c *Cache) evictOldest() {
