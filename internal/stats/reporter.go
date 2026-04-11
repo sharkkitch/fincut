@@ -63,3 +63,8 @@ func (r *Reporter) writeJSON(c *Collector) {
 	r.w.Write(data)
 	fmt.Fprintln(r.w)
 }
+
+// Format returns the output format used by this reporter.
+func (r *Reporter) Format() string {
+	return r.format
+}
