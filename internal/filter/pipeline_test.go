@@ -81,3 +81,14 @@ func TestPipeline_EmptyPipeline(t *testing.T) {
 		t.Errorf("empty pipeline should pass all lines, got %v", result)
 	}
 }
+
+func TestPipeline_Apply_EmptyInput(t *testing.T) {
+	p, err := NewPipeline([]string{"ERROR"})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	result := p.Apply([]string{})
+	if len(result) != 0 {
+		t.Errorf("expected empty result for empty input, got %v", result)
+	}
+}
