@@ -5,71 +5,76 @@ import (
 	"strings"
 )
 
-// LineChange represents a single line-level change between two log snapshots.
-type LineChange struct {
-	Type    ChangeType
-	LineNum int
-	Content string
-}
-
-// ChangeType indicates whether a line was added, removed, or unchanged.
+// ChangeType represents the kind of change in a diff.
 type ChangeType int
 
 const (
+	// Unchanged indicates the line exists in both sequences.
 	Unchanged ChangeType = iota
+	// Added indicates the line was added in the new sequence.
 	Added
+	// Removed indicates the line was removed from the old sequence.
 	Removed
 )
 
-func (c ChangeType) String() string {
-	switch c {
-	case Added:
-		return "added"
-	case Removed:
-		return "removed"
-	default:
-		return "unchanged"
-	}
+// Change represents a single line-level diff entry.
+type Change struct {
+	Type ChangeType
+	Line string
 }
 
-// Diff computes a simple line-level diff between two slices of log lines.
-// It returns a slice of LineChange entries describing additions and removals.
-func Diff(before, after []string) []LineChange {
-	beforeSet := make(map[string]int, len(before))
-	for i, line := range before {
-		beforeSet[line] = i + 1
+// Diff computes a line-level diff between two slices of strings using a
+// simple LCS-based algorithm. It returns an ordered slice of Change entries.
+func Diff(before, after []string) []Change {
+	m := len(before)
+	n := len(after)
+
+	// Build LCS table.
+	table := make([][]int, m+1)
+	for i := range table {
+		table[i] = make([]int, n+1)
 	}
-
-	afterSet := make(map[string]int, len(after))
-	for i, line := range after {
-		afterSet[line] = i + 1
-	}
-
-	var changes []LineChange
-
-	for i, line := range before {
-		if _, found := afterSet[line]; !found {
-			changes = append(changes, LineChange{Type: Removed, LineNum: i + 1, Content: line})
+	for i := 1; i <= m; i++ {
+		for j := 1; j <= n; j++ {
+			if before[i-1] == after[j-1] {
+				table[i][j] = table[i-1][j-1] + 1
+			} else if table[i-1][j] >= table[i][j-1] {
+				table[i][j] = table[i-1][j]
+			} else {
+				table[i][j] = table[i][j-1]
+			}
 		}
 	}
 
-	for i, line := range after {
-		if _, found := beforeSet[line]; !found {
-			changes = append(changes, LineChange{Type: Added, LineNum: i + 1, Content: line})
+	// Backtrack to build change list.
+	var changes []Change
+	i, j := m, n
+	for i > 0 || j > 0 {
+		switch {
+		case i > 0 && j > 0 && before[i-1] == after[j-1]:
+			changes = append([]Change{{Type: Unchanged, Line: before[i-1]}}, changes...)
+			i--
+			j--
+		case j > 0 && (i == 0 || table[i][j-1] >= table[i-1][j]):
+			changes = append([]Change{{Type: Added, Line: after[j-1]}}, changes...)
+			j--
+		default:
+			changes = append([]Change{{Type: Removed, Line: before[i-1]}}, changes...)
+			i--
 		}
 	}
-
 	return changes
 }
 
-// FormatChange returns a human-readable string for a single LineChange.
-func FormatChange(c LineChange) string {
-	prefix := " "
+// FormatChange renders a single Change as a diff-style string.
+// Added lines are prefixed with "+", removed with "-", unchanged with " ".
+func FormatChange(c Change) string {
 	switch c.Type {
 	case Added:
-		prefix = "+"
+		return fmt.Sprintf("+ %s", strings.TrimRight(c.Line, "\n"))
 	case Removed:
-		prefix = "-"
+		return fmt.Sprintf("- %s", strings.TrimRight(c.Line, "\n"))
+	default:
+		return fmt.Sprintf("  %s", strings.TrimRight(c.Line, "\n"))
 	}
-	return fmt.Sprintf("%s [line %d] %s", prefix, c.LineNum, strings.TrimRight(c.Content, "\n"))
 }
