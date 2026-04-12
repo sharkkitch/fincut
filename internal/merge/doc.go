@@ -19,4 +19,12 @@
 //
 // This is useful when merging logs from heterogeneous services and you
 // need to trace each line back to its origin.
+//
+// # Error Handling
+//
+// If SortByTime is enabled and a line does not begin with a recognisable
+// timestamp (according to Options.TimestampLayout), the line is placed
+// before all timestamped lines in its source group. A non-nil error is
+// returned after writing so the caller can decide whether to treat
+// unparseable lines as a fatal condition.
 package merge
