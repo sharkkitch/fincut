@@ -50,3 +50,18 @@ func Merge(base, override *Config) *Config {
 
 	return &out
 }
+
+// Clone returns a deep copy of the given Config.
+// This is useful when you need to modify a config without affecting the original.
+func Clone(c *Config) *Config {
+	copy := *c
+	if c.Input.Files != nil {
+		copy.Input.Files = make([]string, len(c.Input.Files))
+		_ = append(copy.Input.Files[:0], c.Input.Files...)
+	}
+	if c.Filter.Patterns != nil {
+		copy.Filter.Patterns = make([]string, len(c.Filter.Patterns))
+		_ = append(copy.Filter.Patterns[:0], c.Filter.Patterns...)
+	}
+	return &copy
+}
