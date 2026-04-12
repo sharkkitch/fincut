@@ -26,6 +26,9 @@ func NewPipeline(patterns []string) (*Pipeline, error) {
 			invert = true
 			raw = raw[1:]
 		}
+		if raw == "" {
+			return nil, fmt.Errorf("empty pattern is not allowed")
+		}
 		re, err := regexp.Compile(raw)
 		if err != nil {
 			return nil, fmt.Errorf("invalid pattern %q: %w", raw, err)
@@ -61,4 +64,9 @@ func (p *Pipeline) Apply(lines []string) []string {
 		}
 	}
 	return result
+}
+
+// Len returns the number of stages in the pipeline.
+func (p *Pipeline) Len() int {
+	return len(p.Stages)
 }
