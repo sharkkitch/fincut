@@ -78,3 +78,32 @@ func TestReporter_JSON_Output(t *testing.T) {
 		t.Error("expected 'match_rate' key in JSON output")
 	}
 }
+
+func TestReporter_JSON_MatchRate(t *testing.T) {
+	var buf bytes.Buffer
+	r, err := stats.NewReporter(&buf, "json")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	c, _ := stats.NewCollector()
+	c.Record(true)
+	c.Record(true)
+	c.Record(false)
+
+	r.Report(c)
+
+	var result map[string]interface{}
+	if err := json.Unmarshal(buf.Bytes(), &result); err != nil {
+		t.Fatalf("expected valid JSON output, got error: %v\noutput: %s", err, buf.String())
+	}
+
+	// 2 matched out of 3 total => match_rate should be approximately 0.6667
+	matchRate, ok := result["match_rate"].(float64)
+	if !ok {
+		t.Fatalf("expected 'match_rate' to be a float64, got: %T", result["match_rate"])
+	}
+	if matchRate < 0.66 || matchRate > 0.67 {
+		t.Errorf("expected match_rate ~0.6667, got: %f", matchRate)
+	}
+}
