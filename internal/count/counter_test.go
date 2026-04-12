@@ -86,3 +86,23 @@ func TestCounter_EmptyInput(t *testing.T) {
 		t.Errorf("Results() length = %d, want 0", len(results))
 	}
 }
+
+func TestCounter_Results_Sorted_StableOrder(t *testing.T) {
+	// When two lines have equal counts, verify Results() returns a consistent
+	// (deterministic) ordering across multiple calls.
+	c, _ := New(Options{})
+	c.Add("apple")
+	c.Add("banana")
+
+	first := c.Results()
+	second := c.Results()
+
+	if len(first) != len(second) {
+		t.Fatalf("Results() length mismatch: %d vs %d", len(first), len(second))
+	}
+	for i := range first {
+		if first[i].Line != second[i].Line || first[i].Count != second[i].Count {
+			t.Errorf("Results() not stable at index %d: %+v vs %+v", i, first[i], second[i])
+		}
+	}
+}
