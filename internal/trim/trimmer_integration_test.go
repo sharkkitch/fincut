@@ -63,3 +63,24 @@ func TestTrimmer_EmptyInput(t *testing.T) {
 		t.Errorf("expected empty output, got %q", buf.String())
 	}
 }
+
+// TestTrimmer_StripEmptyOnly verifies that StripEmpty without MaxLines
+// removes all blank lines but otherwise preserves all content.
+func TestTrimmer_StripEmptyOnly(t *testing.T) {
+	tr, err := trim.NewTrimmer(trim.Options{
+		StripEmpty: true,
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	lines := []string{"", "foo", "", "", "bar", ""}
+	var buf strings.Builder
+	tr.Apply(lines, &buf)
+	result := strings.Split(strings.TrimRight(buf.String(), "\n"), "\n")
+	if len(result) != 2 {
+		t.Errorf("expected 2 lines after strip, got %d: %v", len(result), result)
+	}
+	if result[0] != "foo" || result[1] != "bar" {
+		t.Errorf("unexpected content: %v", result)
+	}
+}
