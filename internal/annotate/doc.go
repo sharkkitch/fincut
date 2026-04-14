@@ -9,9 +9,17 @@
 // Multiple modes may be combined; fields are joined by a configurable
 // separator (default " | ").
 //
-// Example:
+// # Options
+//
+// Options.TimestampFormat accepts any layout string recognised by the
+// standard library's [time.Format]. Common layouts include [time.RFC3339]
+// and [time.DateTime]. When TimestampFormat is empty, timestamps are
+// omitted even if timestamp annotation is otherwise enabled.
+//
+// # Example
 //
 //	a, _ := annotate.New(annotate.Options{LineNumbers: true, Prefix: "svc"})
 //	out := a.Apply([]string{"hello", "world"})
 //	// out[0] == "1 | svc | hello"
+//	// out[1] == "2 | svc | world"
 package annotate
