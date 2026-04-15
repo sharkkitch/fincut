@@ -1,75 +1,71 @@
-// Package rotate provides log rotation detection and handling for fincut.
-// It detects when a log file has been rotated (truncated or replaced) and
-// allows consumers to reset their read position accordingly.
+// Package rotate detects log file rotation by monitoring inode changes
+// or file truncation, and re-opens the file when rotation is detected.
 package rotate
 
 import (
-	"errors"
+	"fmt"
 	"io"
 	"os"
 	"time"
 )
 
-// Options configures the Rotator behaviour.
+// Options configures the Rotator.
 type Options struct {
-	Path     string
+	// Path is the log file to monitor.
+	Path string
+	// Output is where detected rotation events are written.
+	Output io.Writer
+	// Interval is how often to poll for rotation. Defaults to 5s.
 	Interval time.Duration
-	Output   io.Writer
 }
 
-// Rotator watches a file for rotation events.
+// Rotator monitors a file for rotation events.
 type Rotator struct {
-	path     string
-	interval time.Duration
-	output   io.Writer
-	lastSize int64
-	lastIno  uint64
+	opts Options
 }
 
-// NewRotator creates a new Rotator with the given options.
+// NewRotator creates a Rotator with the given options.
 func NewRotator(opts Options) (*Rotator, error) {
 	if opts.Path == "" {
-		return nil, errors.New("rotate: path must not be empty")
+		return nil, fmt.Errorf("rotate: path must not be empty")
 	}
 	if opts.Output == nil {
-		return nil, errors.New("rotate: output writer must not be nil")
+		return nil, fmt.Errorf("rotate: output writer must not be nil")
 	}
 	if opts.Interval <= 0 {
-		opts.Interval = 2 * time.Second
+		opts.Interval = 5 * time.Second
 	}
-	return &Rotator{
-		path:     opts.Path,
-		interval: opts.Interval,
-		output:   opts.Output,
-	}, nil
+	return &Rotator{opts: opts}, nil
 }
 
-// Snapshot captures the current inode and size of the watched file.
-func (r *Rotator) Snapshot() error {
-	info, err := os.Stat(r.path)
+// Detect checks whether the file at opts.Path has been rotated since
+// the provided baseline os.FileInfo. It returns true if rotation is
+// detected (inode changed or file is smaller than before).
+func (r *Rotator) Detect(baseline os.FileInfo) (bool, error) {
+	current, err := os.Stat(r.opts.Path)
 	if err != nil {
-		return err
+		if os.IsNotExist(err) {
+			return true, nil
+		}
+		return false, fmt.Errorf("rotate: stat %s: %w", r.opts.Path, err)
 	}
-	r.lastSize = info.Size()
-	r.lastIno = inode(info)
-	return nil
-}
-
-// Detect returns true if the file has been rotated since the last Snapshot.
-func (r *Rotator) Detect() (bool, error) {
-	info, err := os.Stat(r.path)
-	if err != nil {
-		return false, err
+	if baseline == nil {
+		return false, nil
 	}
-	currentIno := inode(info)
-	currentSize := info.Size()
-	if currentIno != r.lastIno || currentSize < r.lastSize {
+	if inode(current) != inode(baseline) {
+		return true, nil
+	}
+	if current.Size() < baseline.Size() {
 		return true, nil
 	}
 	return false, nil
 }
 
-// Interval returns the polling interval.
-func (r *Rotator) Interval() time.Duration {
-	return r.interval
+// Baseline returns the current os.FileInfo for the monitored file.
+func (r *Rotator) Baseline() (os.FileInfo, error) {
+	fi, err := os.Stat(r.opts.Path)
+	if err != nil {
+		return nil, fmt.Errorf("rotate: baseline stat %s: %w", r.opts.Path, err)
+	}
+	return fi, nil
 }
