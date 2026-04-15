@@ -67,3 +67,22 @@ func FormatSummary(opts Options) string {
 	}
 	return s
 }
+
+// validateOptions checks that at least one range is provided and that each
+// range has a positive start, a non-negative end, and that end is either 0
+// (meaning EOF) or greater than or equal to start.
+func validateOptions(opts Options) error {
+	if len(opts.Ranges) == 0 {
+		return fmt.Errorf("linenum: at least one range must be specified")
+	}
+	for _, r := range opts.Ranges {
+		start, end := r[0], r[1]
+		if start < 1 {
+			return fmt.Errorf("linenum: range start must be >= 1, got %d", start)
+		}
+		if end != 0 && end < start {
+			return fmt.Errorf("linenum: range end (%d) must be >= start (%d)", end, start)
+		}
+	}
+	return nil
+}
