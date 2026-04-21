@@ -5,29 +5,22 @@ import (
 	"time"
 )
 
-// RotationEvent records metadata about a detected log rotation.
-type RotationEvent struct {
-	Path      string
-	DetectedAt time.Time
-	OldInode  uint64
-	NewInode  uint64
-}
-
-// FormatEvent returns a human-readable summary of a rotation event.
-func FormatEvent(e RotationEvent) string {
+// FormatEvent returns a human-readable rotation event string.
+func FormatEvent(path string, oldIno, newIno uint64, oldSize, newSize int64) string {
+	ts := time.Now().UTC().Format(time.RFC3339)
+	if oldIno != newIno {
+		return fmt.Sprintf(
+			"[%s] rotate: inode changed path=%s old_inode=%d new_inode=%d",
+			ts, path, oldIno, newIno,
+		)
+	}
 	return fmt.Sprintf(
-		"[rotate] %s rotated at %s (inode %d -> %d)",
-		e.Path,
-		e.DetectedAt.Format(time.RFC3339),
-		e.OldInode,
-		e.NewInode,
+		"[%s] rotate: truncation detected path=%s old_size=%d new_size=%d",
+		ts, path, oldSize, newSize,
 	)
 }
 
-// FormatSummary returns a compact one-line summary suitable for log output.
-func FormatSummary(events []RotationEvent) string {
-	if len(events) == 0 {
-		return "[rotate] no rotations detected"
-	}
-	return fmt.Sprintf("[rotate] %d rotation(s) detected", len(events))
+// FormatSummary returns a brief summary string for reporting.
+func FormatSummary(detections int, path string) string {
+	return fmt.Sprintf("rotate: %d rotation(s) detected for %s", detections, path)
 }
